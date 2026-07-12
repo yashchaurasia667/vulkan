@@ -52,7 +52,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
   ktx
 )
 
-target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra)
+target_compile_options(${PROJECT_NAME} PRIVATE -Werror)
 
 # Shader compilation
 find_program(GLSLC glslc 
