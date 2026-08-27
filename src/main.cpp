@@ -1,5 +1,10 @@
 #include <iostream>
+#include <core/vk_engine.h>
 
 int main() {
-  std::cout << "Hello world" << std::endl;
+  std::cout << "vulkan engine" << std::endl;
+  VulkanEngine engine;
+  engine.init();
+  engine.run();
+  engine.cleanup();
 }

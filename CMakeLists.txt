@@ -14,6 +14,7 @@ find_package(glm REQUIRED)
 
 add_subdirectory("external/fastgltf")
 add_subdirectory("external/vk-bootstrap")
+add_subdirectory("external/fmt")
 
 # --- ImGui ---
 set(IMGUI_DIR ${CMAKE_SOURCE_DIR}/external/imgui)
@@ -31,11 +32,13 @@ target_include_directories(imgui PUBLIC
     ${IMGUI_DIR}
     ${IMGUI_DIR}/backends
     /usr/local/include
+    ${CMAKE_SOURCE_DIR}/src
 )
 target_link_libraries(imgui PUBLIC Vulkan::Vulkan SDL3::SDL3)
 
 # --- Main executable ---
-add_executable(${PROJECT_NAME} src/main.cpp)
+file(GLOB_RECURSE SRC "${CMAKE_SOURCE_DIR}/src/*.cpp")
+add_executable(${PROJECT_NAME} ${SRC})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
     Vulkan::Vulkan
@@ -46,6 +49,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     fastgltf
     vk-bootstrap::vk-bootstrap
     imgui
+    fmt::fmt
 )
 
 target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Werror)
