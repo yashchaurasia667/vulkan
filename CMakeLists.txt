@@ -1,88 +1,51 @@
-cmake_minimum_required(VERSION 4.2)
-project(vulkanEngine LANGUAGES C CXX)
+cmake_minimum_required(VERSION 4.0)
+project(vkGuide LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
+# set(CMAKE_CXX_COMPILER /usr/bin/clang++)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(EXTERN "${CMAKE_CURRENT_SOURCE_DIR}/extern")
-
 find_package(Vulkan REQUIRED)
-find_package(glfw3 REQUIRED)
-find_package(volk CONFIG REQUIRED)
+find_package(volk REQUIRED)
 find_package(VulkanMemoryAllocator REQUIRED)
-find_package(glm CONFIG REQUIRED)
-find_package(tinyobjloader REQUIRED)
+find_package(SDL3 REQUIRED)
+find_package(glm REQUIRED)
 
-find_library(Slang_LIBRARY
-  NAMES slang slang-compiler
-  HINTS /usr/include
-  REQUIRED
+add_subdirectory("external/fastgltf")
+add_subdirectory("external/vk-bootstrap")
+
+# --- ImGui ---
+set(IMGUI_DIR ${CMAKE_SOURCE_DIR}/external/imgui)
+set(IMGUI_SOURCES
+    ${IMGUI_DIR}/imgui.cpp
+    ${IMGUI_DIR}/imgui_draw.cpp
+    ${IMGUI_DIR}/imgui_tables.cpp
+    ${IMGUI_DIR}/imgui_widgets.cpp
+    ${IMGUI_DIR}/imgui_demo.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
 )
-
-find_library(SHADERC_LIBRARY
-  NAMES shaderc_shared
-  HINTS /usr/include
+add_library(imgui STATIC ${IMGUI_SOURCES})
+target_include_directories(imgui PUBLIC
+    ${IMGUI_DIR}
+    ${IMGUI_DIR}/backends
+    /usr/local/include
 )
+target_link_libraries(imgui PUBLIC Vulkan::Vulkan SDL3::SDL3)
 
-set(KTX_DIR "${EXTERN}/ktx")
+# --- Main executable ---
+add_executable(${PROJECT_NAME} src/main.cpp)
 
-file(GLOB KTX_SRC "${KTX_DIR}/lib/*.c")
-if(NOT KTX_SRC)
-  message(FATAL_ERROR "No ktx sources found in ${KTX_DIR}/lib/")
-endif()
-
-add_library(ktx STATIC ${KTX_SRC})
-target_compile_features(ktx PRIVATE c_std_99)
-target_include_directories(ktx PUBLIC "${KTX_DIR}/include")
-target_include_directories(ktx PUBLIC "${KTX_DIR}/other_include")
-
-set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "src/")
-file(GLOB_RECURSE SRC "src/*.cpp")
-add_executable(${PROJECT_NAME} ${SRC})
 target_link_libraries(${PROJECT_NAME} PRIVATE
-  Vulkan::Vulkan
-  glfw3
-  volk
-  GPUOpen::VulkanMemoryAllocator
-  glm::glm
-  tinyobjloader::tinyobjloader
-  ${Slang_LIBRARY}
-  ${SHADERC_LIBRARY}
-  ktx
+    Vulkan::Vulkan
+    volk::volk
+    GPUOpen::VulkanMemoryAllocator
+    SDL3::SDL3
+    glm::glm
+    fastgltf
+    vk-bootstrap::vk-bootstrap
+    imgui
 )
 
-target_compile_options(${PROJECT_NAME} PRIVATE -Werror)
-
-# Shader compilation
-find_program(GLSLC glslc 
-  /usr/local/bin/
-  /usr/bin/
-)
-if(NOT GLSLC)
-  message(FATAL_ERROR "Failed to locate glslc on the system")
-endif()
-
-set(SHADER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/shaders")
-set(SPIRV_DIR "${CMAKE_BINARY_DIR}/shaders")
-file(MAKE_DIRECTORY ${SPIRV_DIR})
-
-file(GLOB_RECURSE SHADERS_SRC 
-  "${SHADER_DIR}/*.vert"
-  "${SHADER_DIR}/*.frag"
-)
-set(SPIRV_FILES "")
-
-foreach(SHADER ${SHADERS_SRC})
-  get_filename_component(SHADER_NAME ${SHADER} NAME)
-  set(SPIRV_FILE ${SPIRV_DIR}/${SHADER_NAME}.spv)
-  add_custom_command(
-    OUTPUT ${SPIRV_FILE}
-    COMMAND ${GLSLC} ${SHADER} -o ${SPIRV_FILE}
-    DEPENDS ${SHADER}
-    COMMENT "Compiling shader: ${SHADER_NAME} -> ${SPIRV_FILE}"
-  )
-  list(APPEND SPIRV_FILES ${SPIRV_FILE})
-endforeach()
-add_custom_target(CompileShaders ALL DEPENDS ${SPIRV_FILES})
-add_dependencies(${PROJECT_NAME} CompileShaders)
+target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Werror)

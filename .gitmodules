@@ -1,0 +1,9 @@
+[submodule "external/vk-bootstrap"]
+	path = external/vk-bootstrap
+	url = https://github.com/charles-lunarg/vk-bootstrap
+[submodule "external/imgui"]
+	path = external/imgui
+	url = https://github.com/ocornut/imgui
+[submodule "external/fastgltf"]
+	path = external/fastgltf
+	url = https://github.com/spnda/fastgltf

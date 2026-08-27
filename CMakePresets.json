@@ -1,0 +1,14 @@
+{
+  "version": 4.0,
+  "configurePresets": [
+    {
+      "name": "default",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    }
+  ]
+}
