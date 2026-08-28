@@ -1,8 +1,17 @@
 #pragma once
 
-#include <SDL3/SDL_video.h>
 #include <core/vk_types.h>
 #include <vulkan/vulkan_core.h>
+
+struct FrameData {
+  VkCommandPool _commandPool;
+  VkCommandBuffer _mainCommandBuffer;
+  
+  VkSemaphore _swapchainSemaphore, _renderSemaphore;
+  VkFence _renderFence;
+};
+
+constexpr unsigned int FRAME_OVERLAP = 2;
 
 class VulkanEngine {
 public:
@@ -20,6 +29,21 @@ public:
   VkDevice _device;
   VkSurfaceKHR _surface;
 
+  VkSwapchainKHR _swapchain;
+  VkFormat _swapchainImageFormat;
+
+  std::vector<VkImage> _swapchainImages;
+  std::vector<VkImageView> _swapchainImageViews;
+  VkExtent2D _swapchainExtent;
+
+  FrameData _frames[FRAME_OVERLAP];
+  FrameData &get_current_frame() {
+    return _frames[_frameNumber % FRAME_OVERLAP];
+  }
+
+  VkQueue _graphicsQueue;
+  uint32_t _graphicsQueueFamily;
+
   void init();
   void run();
   void draw();
@@ -30,4 +54,7 @@ private:
   void init_swapchain();
   void init_commands();
   void init_sync_structures();
+
+  void create_swapchain(uint32_t width, uint32_t height);
+  void destroy_swapchain();
 };
