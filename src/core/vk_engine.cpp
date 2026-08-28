@@ -42,8 +42,13 @@ void VulkanEngine::cleanup() {
   if (_isInitialized) {
     vkDeviceWaitIdle(_device);
 
-    for (int i = 0; i < FRAME_OVERLAP; i++) {
+    for (uint32_t i = 0; i < FRAME_OVERLAP; i++) {
       vkDestroyCommandPool(_device, _frames[i]._commandPool, nullptr);
+
+      // destroy sync objects
+      vkDestroyFence(_device, _frames[i]._renderFence, nullptr);
+      vkDestroySemaphore(_device, _frames[i]._renderSemaphore, nullptr);
+      vkDestroySemaphore(_device, _frames[i]._swapchainSemaphore, nullptr);
     }
 
     destroy_swapchain();
@@ -115,7 +120,7 @@ void VulkanEngine::init_commands() {
   VkCommandPoolCreateInfo commandPoolInfo = vkinit::command_pool_create_info(
       _graphicsQueueFamily, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
-  for (int i = 0; i < FRAME_OVERLAP; i++) {
+  for (uint32_t i = 0; i < FRAME_OVERLAP; i++) {
     VK_CHECK(vkCreateCommandPool(_device, &commandPoolInfo, nullptr,
                                  &_frames[i]._commandPool));
 
@@ -189,6 +194,18 @@ void VulkanEngine::draw() {
   VkSubmitInfo2 submit = vkinit::submit_info(&cmdInfo, &signalInfo, &waitInfo);
   VK_CHECK(vkQueueSubmit2(_graphicsQueue, 1, &submit,
                           get_current_frame()._renderFence));
+
+  VkPresentInfoKHR presentInfo{
+      .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+      .waitSemaphoreCount = 1,
+      .pWaitSemaphores = &get_current_frame()._renderSemaphore,
+      .swapchainCount = 1,
+      .pSwapchains = &_swapchain,
+      .pImageIndices = &swapchainImageIndex,
+  };
+
+  VK_CHECK(vkQueuePresentKHR(_graphicsQueue, &presentInfo));
+  _frameNumber++;
 }
 
 void VulkanEngine::run() {
