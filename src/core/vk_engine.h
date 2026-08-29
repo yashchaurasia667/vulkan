@@ -1,14 +1,33 @@
 #pragma once
 
+#define VMA_IMPLEMENTATION
+#include <vma/vk_mem_alloc.h>
+
 #include <core/vk_types.h>
-#include <vulkan/vulkan_core.h>
+#include <deque>
+
+struct DeletionQueue {
+  std::deque<std::function<void()>> deletors;
+
+  void push_function(std::function<void()> &&function) {
+    deletors.push_back(function);
+  }
+  void flush() {
+    for (auto it = deletors.rbegin(); it != deletors.rend(); it++) {
+      (*it)();
+    }
+    deletors.clear();
+  }
+};
 
 struct FrameData {
   VkCommandPool _commandPool;
   VkCommandBuffer _mainCommandBuffer;
-  
+
   VkSemaphore _swapchainSemaphore, _renderSemaphore;
   VkFence _renderFence;
+
+  DeletionQueue _deletionQueue;
 };
 
 constexpr unsigned int FRAME_OVERLAP = 2;
@@ -36,6 +55,9 @@ public:
   std::vector<VkImageView> _swapchainImageViews;
   VkExtent2D _swapchainExtent;
 
+  AllocatedImage _drawImage;
+  VkExtent2D _drawExtent;
+
   FrameData _frames[FRAME_OVERLAP];
   FrameData &get_current_frame() {
     return _frames[_frameNumber % FRAME_OVERLAP];
@@ -44,12 +66,15 @@ public:
   VkQueue _graphicsQueue;
   uint32_t _graphicsQueueFamily;
 
+  DeletionQueue _mainDeletionQueue;
+  VmaAllocator _allocator;
+
   void init();
   void run();
-  void draw();
   void cleanup();
 
 private:
+  void draw();
   void init_vulkan();
   void init_swapchain();
   void init_commands();

@@ -1,13 +1,13 @@
 #pragma once
 
-#include <array>
-#include <deque>
-#include <functional>
-#include <memory>
-#include <optional>
-#include <span>
-#include <string>
-#include <vector>
+// #include <array>
+// #include <deque>
+// #include <functional>
+// #include <memory>
+// #include <optional>
+// #include <span>
+// #include <string>
+// #include <vector>
 
 #include <vma/vk_mem_alloc.h>
 #include <vulkan/vk_enum_string_helper.h>
@@ -25,4 +25,12 @@
       fmt::print("Detected Vulkan Error: {}", string_VkResult(err));           \
       abort();                                                                 \
     }                                                                          \
-  } while(0)
+  } while(0);
+
+struct AllocatedImage {
+  VkImage image;
+  VkImageView imageView;
+  VmaAllocation allocation;
+  VkExtent3D imageExtent;
+  VkFormat imageFormat;
+};
