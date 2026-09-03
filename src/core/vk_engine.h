@@ -1,8 +1,5 @@
 #pragma once
 
-#define VMA_IMPLEMENTATION
-#include <vma/vk_mem_alloc.h>
-
 #include <core/vk_types.h>
 #include <deque>
 
@@ -75,6 +72,8 @@ public:
 
 private:
   void draw();
+  void draw_background(VkCommandBuffer cmd);
+
   void init_vulkan();
   void init_swapchain();
   void init_commands();

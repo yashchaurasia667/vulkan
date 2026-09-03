@@ -1,3 +1,5 @@
+#include <vulkan/vulkan_core.h>
+#define VMA_IMPLEMENTATION
 #include "vk_engine.h"
 
 #include <SDL3/SDL.h>
@@ -195,6 +197,17 @@ void VulkanEngine::init_sync_structures() {
   }
 }
 
+void VulkanEngine::draw_background(VkCommandBuffer cmd) {
+  VkClearColorValue clearValue;
+  float flash = std::abs(std::sin(_frameNumber / 120.0f));
+  clearValue = {{flash, flash, flash, 1.0f}};
+
+  VkImageSubresourceRange clearRange =
+      vkinit::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
+  vkCmdClearColorImage(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL,
+                       &clearValue, 1, &clearRange);
+}
+
 void VulkanEngine::draw() {
   VK_CHECK(vkWaitForFences(_device, 1, &get_current_frame()._renderFence, true,
                            1000000000));
@@ -212,23 +225,28 @@ void VulkanEngine::draw() {
 
   VkCommandBufferBeginInfo beginInfo = vkinit::command_buffer_begin_info(
       VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-  VK_CHECK(vkBeginCommandBuffer(cmd, &beginInfo));
 
+  _drawExtent.width = _drawImage.imageExtent.width;
+  _drawExtent.height = _drawImage.imageExtent.height;
+  VK_CHECK(vkBeginCommandBuffer(cmd, &beginInfo));
   vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex],
                            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
-  VkClearColorValue clearValue;
-  float flash = std::abs(std::sin(_frameNumber / 120.0f));
-  clearValue = {{0.0f, 0.0f, flash, 1.0f}};
+  draw_background(cmd);
 
-  VkImageSubresourceRange clearRange =
-      vkinit::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
-  vkCmdClearColorImage(cmd, _swapchainImages[swapchainImageIndex],
-                       VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
-
+  vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL,
+                           VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex],
-                           VK_IMAGE_LAYOUT_GENERAL,
+                           VK_IMAGE_LAYOUT_UNDEFINED,
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+  vkutil::copy_image_to_image(cmd, _drawImage.image,
+                              _swapchainImages[swapchainImageIndex],
+                              _drawExtent, _swapchainExtent);
+  vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex],
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+
   VK_CHECK(vkEndCommandBuffer(cmd));
 
   VkCommandBufferSubmitInfo cmdInfo = vkinit::command_buffer_submit_info(cmd);
