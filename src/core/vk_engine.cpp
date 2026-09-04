@@ -1,4 +1,3 @@
-#include <vulkan/vulkan_core.h>
 #define VMA_IMPLEMENTATION
 #include "vk_engine.h"
 
@@ -21,6 +20,7 @@ constexpr bool bUseValidationLayers = false;
 VulkanEngine *loadedEngine = nullptr;
 
 VulkanEngine &VulkanEngine::Get() { return *loadedEngine; }
+
 void VulkanEngine::init() {
   assert(loadedEngine == nullptr);
   loadedEngine = this;
@@ -209,22 +209,18 @@ void VulkanEngine::draw_background(VkCommandBuffer cmd) {
 }
 
 void VulkanEngine::draw() {
-  VK_CHECK(vkWaitForFences(_device, 1, &get_current_frame()._renderFence, true,
-                           1000000000));
+  VK_CHECK(vkWaitForFences(_device, 1, &get_current_frame()._renderFence, true, 1000000000));
+  VK_CHECK(vkResetFences(_device, 1, &get_current_frame()._renderFence));
   get_current_frame()._deletionQueue.flush();
 
-  VK_CHECK(vkResetFences(_device, 1, &get_current_frame()._renderFence));
-
+  // request an image from the swapchain
   uint32_t swapchainImageIndex;
-  VK_CHECK(vkAcquireNextImageKHR(_device, _swapchain, 1000000000,
-                                 get_current_frame()._swapchainSemaphore,
-                                 nullptr, &swapchainImageIndex));
+  VK_CHECK(vkAcquireNextImageKHR(_device, _swapchain, 1000000000, get_current_frame()._swapchainSemaphore, nullptr, &swapchainImageIndex));
 
   VkCommandBuffer cmd = get_current_frame()._mainCommandBuffer;
   VK_CHECK(vkResetCommandBuffer(cmd, 0));
 
-  VkCommandBufferBeginInfo beginInfo = vkinit::command_buffer_begin_info(
-      VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+  VkCommandBufferBeginInfo beginInfo = vkinit::command_buffer_begin_info( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
   _drawExtent.width = _drawImage.imageExtent.width;
   _drawExtent.height = _drawImage.imageExtent.height;
