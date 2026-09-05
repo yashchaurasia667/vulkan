@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/vk_descriptors.h"
 #include <core/vk_types.h>
 #include <deque>
 
@@ -55,6 +56,10 @@ public:
   AllocatedImage _drawImage;
   VkExtent2D _drawExtent;
 
+  DescriptorAllocator globalDescriptorAllocator;
+  VkDescriptorSet _drawImageDescriptors;
+  VkDescriptorSetLayout _drawImageDescriptorLayout;
+
   FrameData _frames[FRAME_OVERLAP];
   FrameData &get_current_frame() {
     return _frames[_frameNumber % FRAME_OVERLAP];
@@ -62,6 +67,9 @@ public:
 
   VkQueue _graphicsQueue;
   uint32_t _graphicsQueueFamily;
+
+  VkPipeline _gradientPipeline;
+  VkPipelineLayout _gradientPipelineLayout;
 
   DeletionQueue _mainDeletionQueue;
   VmaAllocator _allocator;
@@ -79,6 +87,10 @@ private:
   void init_commands();
   void init_sync_structures();
 
+  void init_descriptors();
+  void init_pipelines();
+
   void create_swapchain(uint32_t width, uint32_t height);
+  void init_background_pipelines();
   void destroy_swapchain();
 };
