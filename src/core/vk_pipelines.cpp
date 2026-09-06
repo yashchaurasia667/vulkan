@@ -21,7 +21,7 @@ bool vkutil::load_shader_module(const char *filePath, VkDevice device,
   createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
   createInfo.pNext = nullptr;
 
-  createInfo.codeSize = buffer.size();
+  createInfo.codeSize = buffer.size() * sizeof(uint32_t);
   createInfo.pCode = buffer.data();
 
   VkShaderModule shaderModule;

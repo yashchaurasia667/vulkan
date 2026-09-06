@@ -61,9 +61,6 @@ public:
   VkDescriptorSetLayout _drawImageDescriptorLayout;
 
   FrameData _frames[FRAME_OVERLAP];
-  FrameData &get_current_frame() {
-    return _frames[_frameNumber % FRAME_OVERLAP];
-  }
 
   VkQueue _graphicsQueue;
   uint32_t _graphicsQueueFamily;
@@ -77,6 +74,9 @@ public:
   void init();
   void run();
   void cleanup();
+  FrameData &get_current_frame() {
+    return _frames[_frameNumber % FRAME_OVERLAP];
+  }
 
 private:
   void draw();

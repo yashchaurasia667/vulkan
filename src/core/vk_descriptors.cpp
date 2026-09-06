@@ -25,6 +25,7 @@ DescriptorLayoutBuilder::build(VkDevice device, VkShaderStageFlags shaderStages,
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
   info.pNext = pNext;
   info.bindingCount = (uint32_t)bindings.size();
+  info.pBindings = bindings.data();
   info.flags = flags;
 
   VkDescriptorSetLayout set;

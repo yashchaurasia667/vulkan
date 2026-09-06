@@ -1,4 +1,3 @@
-#include <vulkan/vulkan_core.h>
 #define VMA_IMPLEMENTATION
 #include "vk_engine.h"
 
@@ -21,7 +20,7 @@
 #include <thread>
 #include <vector>
 
-constexpr bool bUseValidationLayers = false;
+constexpr bool bUseValidationLayers = true;
 
 VulkanEngine *loadedEngine = nullptr;
 
@@ -216,8 +215,11 @@ void VulkanEngine::draw_background(VkCommandBuffer cmd) {
   //                      &clearValue, 1, &clearRange);
 
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _gradientPipeline);
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _gradientPipelineLayout, 0, 1, &_drawImageDescriptors, 0, nullptr);
-  vkCmdDispatch(cmd, std::ceil(_drawExtent.width / 16.0), std::ceil(_drawExtent.height / 16.0), 1);
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          _gradientPipelineLayout, 0, 1, &_drawImageDescriptors,
+                          0, nullptr);
+  vkCmdDispatch(cmd, std::ceil(_drawExtent.width / 16.0),
+                std::ceil(_drawExtent.height / 16.0), 1);
 }
 
 void VulkanEngine::draw() {
@@ -241,8 +243,8 @@ void VulkanEngine::draw() {
   _drawExtent.width = _drawImage.imageExtent.width;
   _drawExtent.height = _drawImage.imageExtent.height;
   VK_CHECK(vkBeginCommandBuffer(cmd, &beginInfo));
-  vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex],
-                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+  vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED,
+                           VK_IMAGE_LAYOUT_GENERAL);
 
   draw_background(cmd);
 
