@@ -1,3 +1,4 @@
+#include <vulkan/vulkan_core.h>
 #define VMA_IMPLEMENTATION
 #include "vk_engine.h"
 
@@ -19,6 +20,10 @@
 #include <sys/wait.h>
 #include <thread>
 #include <vector>
+
+#include "imgui.h"
+#include "imgui_impl_sdl3.h"
+#include "imgui_impl_vulkan.h"
 
 constexpr bool bUseValidationLayers = true;
 
@@ -42,6 +47,7 @@ void VulkanEngine::init() {
   init_sync_structures();
   init_descriptors();
   init_pipelines();
+  init_imgui();
 
   _isInitialized = true;
 }
@@ -186,6 +192,17 @@ void VulkanEngine::init_commands() {
     VK_CHECK(vkAllocateCommandBuffers(_device, &cmdAllocInfo,
                                       &_frames[i]._mainCommandBuffer));
   }
+
+  // imgui
+  VK_CHECK(vkCreateCommandPool(_device, &commandPoolInfo, nullptr,
+                               &_immCommandPool));
+  VkCommandBufferAllocateInfo cmdAllocInfo =
+      vkinit::command_buffer_allocate_info(_immCommandPool);
+  VK_CHECK(
+      vkAllocateCommandBuffers(_device, &cmdAllocInfo, &_immCommandBuffer));
+
+  _mainDeletionQueue.push_function(
+      [=, this]() { vkDestroyCommandPool(_device, _immCommandPool, nullptr); });
 }
 
 void VulkanEngine::init_sync_structures() {
@@ -202,6 +219,10 @@ void VulkanEngine::init_sync_structures() {
     VK_CHECK(vkCreateSemaphore(_device, &semaphoreCreateInfo, nullptr,
                                &_frames[i]._swapchainSemaphore));
   }
+
+  VK_CHECK(vkCreateFence(_device, &fenceCreateInfo, nullptr, &_immFence));
+  _mainDeletionQueue.push_function(
+      [=, this]() { vkDestroyFence(_device, _immFence, nullptr); });
 }
 
 void VulkanEngine::draw_background(VkCommandBuffer cmd) {
@@ -302,12 +323,20 @@ void VulkanEngine::run() {
         stop_rendering = true;
       if (e.type == SDL_EVENT_WINDOW_RESTORED)
         stop_rendering = false;
+
+      ImGui_ImplSDL3_ProcessEvent(&e);
     }
 
     if (stop_rendering) {
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
       continue;
     }
+
+    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplSDL3_NewFrame();
+    ImGui::NewFrame();
+    ImGui::Render();
+
     draw();
   }
 }
@@ -415,6 +444,78 @@ void VulkanEngine::init_background_pipelines() {
     vkDestroyPipelineLayout(_device, _gradientPipelineLayout, nullptr);
     vkDestroyPipeline(_device, _gradientPipeline, nullptr);
   });
+}
+
+void VulkanEngine::immediate_submit(
+    std::function<void(VkCommandBuffer cmd)> &&function) {
+  VK_CHECK(vkResetFences(_device, 1, &_immFence));
+  VK_CHECK(vkResetCommandBuffer(_immCommandBuffer, 0));
+
+  VkCommandBuffer cmd = _immCommandBuffer;
+  VkCommandBufferBeginInfo cmdBeginInfo = vkinit::command_buffer_begin_info();
+
+  VK_CHECK(vkBeginCommandBuffer(_immCommandBuffer, &cmdBeginInfo));
+  function(cmd);
+  VK_CHECK(vkEndCommandBuffer(_immCommandBuffer));
+
+  VkCommandBufferSubmitInfo cmdinfo = vkinit::command_buffer_submit_info(cmd);
+	VkSubmitInfo2 submit = vkinit::submit_info(&cmdinfo, nullptr, nullptr);
+
+	VK_CHECK(vkQueueSubmit2(_graphicsQueue, 1, &submit, _immFence));
+	VK_CHECK(vkWaitForFences(_device, 1, &_immFence, true, 9999999999));
+}
+
+void VulkanEngine::init_imgui() {
+  VkDescriptorPoolSize pool_sizes[] = { { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+		{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 } };
+
+  VkDescriptorPoolCreateInfo pool_info = {
+    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+    .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+    .maxSets = 1000,
+    .poolSizeCount = (uint32_t)std::size(pool_sizes),
+    .pPoolSizes = pool_sizes
+  };
+
+  VkDescriptorPool imguiPool;
+  VK_CHECK(vkCreateDescriptorPool(_device, &pool_info, nullptr, &imguiPool));
+
+  ImGui::CreateContext();
+  ImGui_ImplSDL3_InitForVulkan(_window);
+
+  // this initializes imgui for Vulkan
+  ImGui_ImplVulkan_InitInfo init_info = {};
+  init_info.Instance = _instance;
+  init_info.PhysicalDevice = _chosenGpu;
+  init_info.Device = _device;
+  init_info.Queue = _graphicsQueue;
+  init_info.DescriptorPool = imguiPool;
+  init_info.MinImageCount = 3;
+  init_info.ImageCount = 3;
+  init_info.UseDynamicRendering = true;
+
+  init_info.PipelineInfoMain.PipelineRenderingCreateInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO };
+  init_info.PipelineInfoMain.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+  init_info.PipelineInfoMain.PipelineRenderingCreateInfo.pColorAttachmentFormats = &_swapchainImageFormat;
+
+  init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+
+  ImGui_ImplVulkan_Init(&init_info);
+
+	// add the destroy the imgui created structures
+	_mainDeletionQueue.push_function([=, this]() {
+		ImGui_ImplVulkan_Shutdown();
+		vkDestroyDescriptorPool(_device, imguiPool, nullptr);
+	});
 }
 
 void VulkanEngine::destroy_swapchain() {

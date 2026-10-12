@@ -71,6 +71,12 @@ public:
   DeletionQueue _mainDeletionQueue;
   VmaAllocator _allocator;
 
+  //imgui
+  VkFence _immFence;
+  VkCommandBuffer _immCommandBuffer;
+  VkCommandPool _immCommandPool;
+  void immediate_submit(std::function<void(VkCommandBuffer cmd)> &&function);
+
   void init();
   void run();
   void cleanup();
@@ -92,5 +98,6 @@ private:
 
   void create_swapchain(uint32_t width, uint32_t height);
   void init_background_pipelines();
+  void init_imgui();
   void destroy_swapchain();
 };
