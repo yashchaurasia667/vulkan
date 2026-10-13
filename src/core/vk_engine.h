@@ -28,6 +28,13 @@ struct FrameData {
   DeletionQueue _deletionQueue;
 };
 
+struct ComputePushConstants {
+	glm::vec4 data1;
+	glm::vec4 data2;
+	glm::vec4 data3;
+	glm::vec4 data4;
+};
+
 constexpr unsigned int FRAME_OVERLAP = 2;
 
 class VulkanEngine {
@@ -99,5 +106,7 @@ private:
   void create_swapchain(uint32_t width, uint32_t height);
   void init_background_pipelines();
   void init_imgui();
+  void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView);
+
   void destroy_swapchain();
 };
