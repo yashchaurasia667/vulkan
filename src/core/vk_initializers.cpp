@@ -1,4 +1,5 @@
 #include "vk_initializers.h"
+#include <vulkan/vulkan_core.h>
 
 VkCommandPoolCreateInfo
 vkinit::command_pool_create_info(uint32_t queueFamilyIndex,
@@ -157,15 +158,16 @@ VkSubmitInfo2 vkinit::submit_info(VkCommandBufferSubmitInfo *cmd,
 }
 
 VkRenderingAttachmentInfo vkinit::attachment_info(
-    VkImageView view, VkClearValue* clear ,VkImageLayout layout /*= VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL*/)
-{
-  VkRenderingAttachmentInfo colorAttachment {};
+    VkImageView view, VkClearValue *clear,
+    VkImageLayout layout /*= VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL*/) {
+  VkRenderingAttachmentInfo colorAttachment{};
   colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
   colorAttachment.pNext = nullptr;
 
   colorAttachment.imageView = view;
   colorAttachment.imageLayout = layout;
-  colorAttachment.loadOp = clear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+  colorAttachment.loadOp =
+      clear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
   colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
   if (clear) {
     colorAttachment.clearValue = *clear;
@@ -174,14 +176,15 @@ VkRenderingAttachmentInfo vkinit::attachment_info(
   return colorAttachment;
 }
 
-VkRenderingInfo vkinit::rendering_info(VkExtent2D renderExtent, VkRenderingAttachmentInfo* colorAttachment,
-    VkRenderingAttachmentInfo* depthAttachment)
-{
-  VkRenderingInfo renderInfo {};
+VkRenderingInfo
+vkinit::rendering_info(VkExtent2D renderExtent,
+                       VkRenderingAttachmentInfo *colorAttachment,
+                       VkRenderingAttachmentInfo *depthAttachment) {
+  VkRenderingInfo renderInfo{};
   renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
   renderInfo.pNext = nullptr;
 
-  renderInfo.renderArea = VkRect2D { VkOffset2D { 0, 0 }, renderExtent };
+  renderInfo.renderArea = VkRect2D{VkOffset2D{0, 0}, renderExtent};
   renderInfo.layerCount = 1;
   renderInfo.colorAttachmentCount = 1;
   renderInfo.pColorAttachments = colorAttachment;
@@ -189,4 +192,32 @@ VkRenderingInfo vkinit::rendering_info(VkExtent2D renderExtent, VkRenderingAttac
   renderInfo.pStencilAttachment = nullptr;
 
   return renderInfo;
+}
+
+VkPipelineShaderStageCreateInfo
+vkinit::pipeline_shader_stage_create_info(VkShaderStageFlagBits stage,
+                                          VkShaderModule shaderModule,
+                                          const char *entry) {
+  VkPipelineShaderStageCreateInfo shaderInfo{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = stage,
+      .module = shaderModule,
+      .pName = entry,
+  };
+
+  return shaderInfo;
+}
+
+VkPipelineLayoutCreateInfo vkinit::pipeline_layout_create_info() {
+  VkPipelineLayoutCreateInfo info{};
+  info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+  info.pNext = nullptr;
+
+  // empty defaults
+  info.flags = 0;
+  info.setLayoutCount = 0;
+  info.pSetLayouts = nullptr;
+  info.pushConstantRangeCount = 0;
+  info.pPushConstantRanges = nullptr;
+  return info;
 }

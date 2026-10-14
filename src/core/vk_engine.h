@@ -3,6 +3,7 @@
 #include "core/vk_descriptors.h"
 #include <core/vk_types.h>
 #include <deque>
+#include <vulkan/vulkan_core.h>
 
 struct DeletionQueue {
   std::deque<std::function<void()>> deletors;
@@ -75,6 +76,9 @@ public:
   VkPipeline _gradientPipeline;
   VkPipelineLayout _gradientPipelineLayout;
 
+  VkPipelineLayout _trianglePipelineLayout;
+  VkPipeline _trianglePipeline;
+
   DeletionQueue _mainDeletionQueue;
   VmaAllocator _allocator;
 
@@ -94,6 +98,7 @@ public:
 private:
   void draw();
   void draw_background(VkCommandBuffer cmd);
+  void draw_geometry(VkCommandBuffer cmd);
 
   void init_vulkan();
   void init_swapchain();
@@ -102,6 +107,7 @@ private:
 
   void init_descriptors();
   void init_pipelines();
+  void init_triangle_pipeline();
 
   void create_swapchain(uint32_t width, uint32_t height);
   void init_background_pipelines();
