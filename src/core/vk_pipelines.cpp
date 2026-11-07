@@ -5,6 +5,7 @@
 #include "fmt/base.h"
 #include <cstdint>
 #include <fstream>
+#include <vulkan/vulkan_core.h>
 
 bool vkutil::load_shader_module(const char *filePath, VkDevice device,
                                 VkShaderModule *outShaderModule) {
@@ -166,6 +167,18 @@ void PipelineBuilder::disable_depthtest() {
   _depthStencil.depthTestEnable = VK_FALSE;
   _depthStencil.depthWriteEnable = VK_FALSE;
   _depthStencil.depthCompareOp = VK_COMPARE_OP_NEVER;
+  _depthStencil.depthBoundsTestEnable = VK_FALSE;
+  _depthStencil.stencilTestEnable = VK_FALSE;
+  _depthStencil.front = {};
+  _depthStencil.back = {};
+  _depthStencil.minDepthBounds = 0.f;
+  _depthStencil.maxDepthBounds = 1.f;
+}
+
+void PipelineBuilder::enable_depthtest(bool depthWriteEnable, VkCompareOp op) {
+  _depthStencil.depthTestEnable = VK_TRUE;
+  _depthStencil.depthWriteEnable = depthWriteEnable;
+  _depthStencil.depthCompareOp = op;
   _depthStencil.depthBoundsTestEnable = VK_FALSE;
   _depthStencil.stencilTestEnable = VK_FALSE;
   _depthStencil.front = {};

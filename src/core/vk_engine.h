@@ -1,6 +1,8 @@
 #pragma once
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 
 #include "core/vk_descriptors.h"
+#include <core/vk_loader.h>
 #include <core/vk_types.h>
 #include <deque>
 
@@ -29,10 +31,10 @@ struct FrameData {
 };
 
 struct ComputePushConstants {
-	glm::vec4 data1;
-	glm::vec4 data2;
-	glm::vec4 data3;
-	glm::vec4 data4;
+  glm::vec4 data1;
+  glm::vec4 data2;
+  glm::vec4 data3;
+  glm::vec4 data4;
 };
 
 constexpr unsigned int FRAME_OVERLAP = 2;
@@ -61,6 +63,7 @@ public:
   VkExtent2D _swapchainExtent;
 
   AllocatedImage _drawImage;
+  AllocatedImage _depthImage;
   VkExtent2D _drawExtent;
 
   DescriptorAllocator globalDescriptorAllocator;
@@ -82,11 +85,12 @@ public:
   VkPipelineLayout _meshPipelineLayout;
   VkPipeline _meshPipeline;
   GPUMeshBuffers rectangle;
+  std::vector<std::shared_ptr<MeshAsset>> testMeshes;
 
   DeletionQueue _mainDeletionQueue;
   VmaAllocator _allocator;
 
-  //imgui
+  // imgui
   VkFence _immFence;
   VkCommandBuffer _immCommandBuffer;
   VkCommandPool _immCommandPool;
@@ -95,6 +99,9 @@ public:
   void init();
   void run();
   void cleanup();
+  GPUMeshBuffers uploadMesh(std::span<uint32_t> indices,
+                            std::span<Vertex> vertices);
+
   FrameData &get_current_frame() {
     return _frames[_frameNumber % FRAME_OVERLAP];
   }
@@ -120,8 +127,8 @@ private:
   void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView);
 
   void destroy_swapchain();
-  AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
-  void destroy_buffer(const AllocatedBuffer& buffer);
-  GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
+  AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage,
+                                VmaMemoryUsage memoryUsage);
+  void destroy_buffer(const AllocatedBuffer &buffer);
   void init_default_data();
 };
