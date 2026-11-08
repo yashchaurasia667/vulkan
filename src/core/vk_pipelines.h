@@ -31,6 +31,8 @@ public:
   void set_depth_format(VkFormat format);
   void enable_depthtest(bool depthWriteEnable, VkCompareOp op);
   void disable_depthtest();
+  void enable_blending_additive();
+  void enable_blending_alphablend();
 };
 
 namespace vkutil {

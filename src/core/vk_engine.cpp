@@ -1,3 +1,8 @@
+#include <SDL3/SDL_video.h>
+#include <cstdint>
+#include <iostream>
+#include <ostream>
+#include <vulkan/vulkan_core.h>
 #define VMA_IMPLEMENTATION
 #include "vk_engine.h"
 
@@ -37,7 +42,8 @@ void VulkanEngine::init() {
   loadedEngine = this;
 
   SDL_Init(SDL_INIT_VIDEO);
-  SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN);
+  SDL_WindowFlags window_flags =
+      (SDL_WindowFlags)(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
 
   _window = SDL_CreateWindow("Vulkan Engine", _windowExtent.width,
                              _windowExtent.height, window_flags);
@@ -50,7 +56,6 @@ void VulkanEngine::init() {
   init_pipelines();
   init_imgui();
 
-  init_default_data();
   _isInitialized = true;
 }
 
@@ -151,7 +156,16 @@ void VulkanEngine::init_vulkan() {
 void VulkanEngine::init_swapchain() {
   create_swapchain(_windowExtent.width, _windowExtent.height);
 
+  // screen resolution
+  auto resolution = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
+  std::cout << resolution->w << std::endl;
+  std::cout << resolution->h << std::endl;
+
   VkExtent3D drawImageExtent = {_windowExtent.width, _windowExtent.height, 1};
+  if (resolution != nullptr) {
+    drawImageExtent = {static_cast<uint32_t>(resolution->w),
+                       static_cast<uint32_t>(resolution->h), 1};
+  }
 
   _drawImage.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
   _drawImage.imageExtent = drawImageExtent;
@@ -339,9 +353,13 @@ void VulkanEngine::draw() {
 
   // request an image from the swapchain
   uint32_t swapchainImageIndex;
-  VK_CHECK(vkAcquireNextImageKHR(_device, _swapchain, 1000000000,
-                                 get_current_frame()._swapchainSemaphore,
-                                 nullptr, &swapchainImageIndex));
+  VkResult e = vkAcquireNextImageKHR(_device, _swapchain, 1000000000,
+                                     get_current_frame()._swapchainSemaphore,
+                                     nullptr, &swapchainImageIndex);
+  if (e == VK_ERROR_OUT_OF_DATE_KHR) {
+    resize_requested = true;
+    return;
+  }
 
   VkCommandBuffer cmd = get_current_frame()._mainCommandBuffer;
   VK_CHECK(vkResetCommandBuffer(cmd, 0));
@@ -349,12 +367,17 @@ void VulkanEngine::draw() {
   VkCommandBufferBeginInfo beginInfo = vkinit::command_buffer_begin_info(
       VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
-  _drawExtent.width = _drawImage.imageExtent.width;
-  _drawExtent.height = _drawImage.imageExtent.height;
+  _drawExtent.width =
+      std::min(_swapchainExtent.width, _drawImage.imageExtent.width) *
+      renderScale;
+  _drawExtent.height =
+      std::min(_swapchainExtent.height, _drawImage.imageExtent.height) *
+      renderScale;
+
   VK_CHECK(vkBeginCommandBuffer(cmd, &beginInfo));
   vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED,
                            VK_IMAGE_LAYOUT_GENERAL);
-  // draw_background(cmd);
+  draw_background(cmd);
   //
   vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL,
                            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -433,10 +456,17 @@ void VulkanEngine::run() {
       continue;
     }
 
+    if (resize_requested) {
+      resize_swapchain();
+    }
+
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
-    ImGui::ShowDemoWindow();
+    if (ImGui::Begin("background")) {
+      ImGui::SliderFloat("render scale", &renderScale, 0.3f, 1.f);
+      ImGui::End();
+    }
     ImGui::Render();
 
     draw();
@@ -486,7 +516,6 @@ void VulkanEngine::init_pipelines() {
   init_background_pipelines();
 
   // graphics pipelines
-  // init_triangle_pipeline();
   init_mesh_pipeline();
 }
 
@@ -650,57 +679,24 @@ void VulkanEngine::draw_imgui(VkCommandBuffer cmd,
   vkCmdEndRendering(cmd);
 }
 
+void VulkanEngine::resize_swapchain() {
+  vkDeviceWaitIdle(_device);
+  destroy_swapchain();
+
+  int w, h;
+  SDL_GetWindowSize(_window, &w, &h);
+  _windowExtent.width = w;
+  _windowExtent.height = h;
+
+  create_swapchain(_windowExtent.width, _windowExtent.height);
+  resize_requested = false;
+}
+
 void VulkanEngine::destroy_swapchain() {
   vkDestroySwapchainKHR(_device, _swapchain, nullptr);
   for (uint32_t i = 0; i < _swapchainImageViews.size(); i++) {
     vkDestroyImageView(_device, _swapchainImageViews[i], nullptr);
   }
-}
-
-void VulkanEngine::init_triangle_pipeline() {
-  VkShaderModule triangleFragShader;
-  if (!vkutil::load_shader_module("build/shaders/colored_triangle.frag.spv",
-                                  _device, &triangleFragShader)) {
-    fmt::print("ERROR when building triangle fragment shader module\n");
-  } else {
-    fmt::print("Triangle fragment shader successfully loaded\n");
-  }
-
-  VkShaderModule triangleVertexShader;
-  if (!vkutil::load_shader_module("build/shaders/colored_triangle.vert.spv",
-                                  _device, &triangleVertexShader)) {
-    fmt::print("Error when building the triangle vertex shader module\n");
-  } else {
-    fmt::print("Triangle vertex shader succesfully loaded\n");
-  }
-
-  VkPipelineLayoutCreateInfo pipline_layout_info =
-      vkinit::pipeline_layout_create_info();
-  VK_CHECK(vkCreatePipelineLayout(_device, &pipline_layout_info, nullptr,
-                                  &_trianglePipelineLayout));
-
-  PipelineBuilder pipelineBuilder;
-  pipelineBuilder._pipelineLayout = _trianglePipelineLayout;
-  pipelineBuilder.set_shaders(triangleVertexShader, triangleFragShader);
-  pipelineBuilder.set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-  pipelineBuilder.set_polygon_mode(VK_POLYGON_MODE_FILL);
-  pipelineBuilder.set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
-  pipelineBuilder.set_multisampling_none();
-  pipelineBuilder.disable_blending();
-  pipelineBuilder.disable_depthtest();
-
-  pipelineBuilder.set_color_attachment_format(_drawImage.imageFormat);
-  pipelineBuilder.set_depth_format(_depthImage.imageFormat);
-
-  _trianglePipeline = pipelineBuilder.build_pipeline(_device);
-
-  vkDestroyShaderModule(_device, triangleFragShader, nullptr);
-  vkDestroyShaderModule(_device, triangleVertexShader, nullptr);
-
-  _mainDeletionQueue.push_function([&]() {
-    vkDestroyPipelineLayout(_device, _trianglePipelineLayout, nullptr);
-    vkDestroyPipeline(_device, _trianglePipeline, nullptr);
-  });
 }
 
 void VulkanEngine::init_mesh_pipeline() {
@@ -740,7 +736,9 @@ void VulkanEngine::init_mesh_pipeline() {
   pipelineBuilder.set_polygon_mode(VK_POLYGON_MODE_FILL);
   pipelineBuilder.set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
   pipelineBuilder.set_multisampling_none();
-  pipelineBuilder.disable_blending();
+
+  pipelineBuilder.enable_blending_additive();
+  // pipelineBuilder.disable_blending();
   pipelineBuilder.enable_depthtest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
   // pipelineBuilder.disable_depthtest();
 
@@ -836,36 +834,4 @@ GPUMeshBuffers VulkanEngine::uploadMesh(std::span<uint32_t> indices,
 
   destroy_buffer(staging);
   return newSurface;
-}
-
-void VulkanEngine::init_default_data() {
-  std::array<Vertex, 4> rect_vertices;
-
-  rect_vertices[0].position = {0.5, -0.5, 0};
-  rect_vertices[1].position = {0.5, 0.5, 0};
-  rect_vertices[2].position = {-0.5, -0.5, 0};
-  rect_vertices[3].position = {-0.5, 0.5, 0};
-
-  rect_vertices[0].color = {0, 0, 0, 1};
-  rect_vertices[1].color = {0.5, 0.5, 0.5, 1};
-  rect_vertices[2].color = {1, 0, 0, 1};
-  rect_vertices[3].color = {0, 1, 0, 1};
-
-  std::array<uint32_t, 6> rect_indices;
-
-  rect_indices[0] = 0;
-  rect_indices[1] = 1;
-  rect_indices[2] = 2;
-
-  rect_indices[3] = 2;
-  rect_indices[4] = 1;
-  rect_indices[5] = 3;
-
-  rectangle = uploadMesh(rect_indices, rect_vertices);
-
-  // delete the rectangle data on engine shutdown
-  _mainDeletionQueue.push_function([&]() {
-    destroy_buffer(rectangle.indexBuffer);
-    destroy_buffer(rectangle.vertexBuffer);
-  });
 }
