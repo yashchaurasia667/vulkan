@@ -1,4 +1,5 @@
 #pragma once
+#include <vulkan/vulkan_core.h>
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 
 #include "core/vk_descriptors.h"
@@ -28,13 +29,14 @@ struct DeletionQueue {
 
 // contains all data that a single frame needs
 struct FrameData {
-  VkCommandPool _commandPool;
-  VkCommandBuffer _mainCommandBuffer;
-
   VkSemaphore _swapchainSemaphore, _renderSemaphore;
   VkFence _renderFence;
 
+  VkCommandPool _commandPool;
+  VkCommandBuffer _mainCommandBuffer;
+
   DeletionQueue _deletionQueue;
+  DescriptorAllocatorGrowable _frameDescriptors;
 };
 
 // very fast small memory that can be pushed to gpu
@@ -43,6 +45,15 @@ struct ComputePushConstants {
   glm::vec4 data2;
   glm::vec4 data3;
   glm::vec4 data4;
+};
+
+struct GPUSceneData {
+  glm::mat4 view;
+  glm::mat4 proj;
+  glm::mat4 viewproj;
+  glm::vec4 ambientColor;
+  glm::vec4 sunlightDirection; // w for sun power
+  glm::vec4 sunlightColor;
 };
 
 // 1 front and 1 back buffer
@@ -94,7 +105,19 @@ public:
   VkDescriptorSet _drawImageDescriptors; // an instance of a descritor set
                                          // layout with real bindings
 
+  // texture stuff
+  AllocatedImage _whiteImage;
+  AllocatedImage _blackImage;
+  AllocatedImage _greyImage;
+  AllocatedImage _errorCheckerboardImage;
+
+  VkSampler _defaultSamplerLinear;
+  VkSampler _defaultSamplerNearest;
+  VkDescriptorSetLayout _singleImageDescriptorLayout;
+
   FrameData _frames[FRAME_OVERLAP];
+  GPUSceneData sceneData;
+  VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;
 
   // select a queue to submit tasks to
   VkQueue _graphicsQueue;
@@ -143,6 +166,7 @@ private:
   void init_descriptors();
   void init_pipelines();
   void init_mesh_pipeline();
+  void init_default_data();
 
   void create_swapchain(uint32_t width, uint32_t height);
   void init_background_pipelines();
@@ -153,4 +177,10 @@ private:
   AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage,
                                 VmaMemoryUsage memoryUsage);
   void destroy_buffer(const AllocatedBuffer &buffer);
+
+  AllocatedImage create_image(VkExtent3D size, VkFormat format,
+                              VkImageUsageFlags usage, bool mipmapped = false);
+  AllocatedImage create_image(void *data, VkExtent3D size, VkFormat format,
+                              VkImageUsageFlags usage, bool mipmapped = false);
+  void destroy_image(const AllocatedImage &img);
 };
